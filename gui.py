@@ -1,10 +1,8 @@
-import tkinter
-import tkinter.messagebox
 import customtkinter
 import datetime
-import time
 import vibration_patterns
 import inspect
+import random
 
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -78,21 +76,21 @@ class App(customtkinter.CTk):
         self.begin_experiment_button = customtkinter.CTkButton(master=self.begin_experiment_frame, fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"), text="Begin Experiment", command=self.begin_experiment)
         self.begin_experiment_button.grid(row=5, column=0, columnspan = 2, padx=(20, 20), pady=(20, 20), sticky="nsew")
 
+        #create the experiment frame
+        self.experiment_frame = customtkinter.CTkFrame(self)
+        self.experiment_frame.grid(row=0, column=3, columnspan = 2, rowspan = 2, padx=(20, 20), pady=(10, 10), sticky="nsew")
+        self.experiment_frame.rowconfigure((0,3), weight = 1)
+        self.experiment_frame.columnconfigure((0,3), weight = 1)
 
-
-        # TODO: set default values
+        # Set default values
         self.number_of_trials = 80 # TODO: Need to make this configurable in the settings menu
 
         # Set empty variables to fill later
         self.subject_ID = None
-        self.phone_type = None
         self.selected_trial_group = None
+        self.session = None
  
-
-        self.current_trial = None
-
-
-
+        self.buttons_list = []
 
 
     def open_settings_menu(self):
@@ -135,18 +133,17 @@ class App(customtkinter.CTk):
         
 
         if self.session_selection_dropdown.get() != "":
-            self.phone_type = self.session_selection_dropdown.get()
+            self.session = self.session_selection_dropdown.get()
         else:
             print("Must select session type")
             # TODO: Add a popup here
             return
 
-        #TODO: Import the proper dictionary from other file based on phone type. This will set the number of trial types based on the size of this dictionary.
+        # Dynamically access the dictionary using the trial_group string
+        self.trial_dict = getattr(vibration_patterns, self.trial_group_dropdown.get(), None)
 
-        #TODO: generate a list of trials? - Needs to be equal number of trials and needs to be length of 
-
-        # Set the trial counter to 0
-        self.current_trial = 0
+        # Generate a list of trials, randomized order and roughly equal
+        self.trial_list = self.create_trials(list(self.trial_dict.keys()), self.number_of_trials)
 
         # Disable the experiment setup pane so that you cannot change these values
         self.ID_entry.configure(state = "disabled")
@@ -156,33 +153,37 @@ class App(customtkinter.CTk):
         self.vibration_demo_button.configure(state = "disabled")
 
         # Generate the name of the log file (.txt or .csv) for that experiment and store it as an attribute (ID_date_{training or testing})
-        self.export_log_file_name = "TrialLog_" + self.subject_ID + "_" + self.phone_type + "_" + datetime.datetime.now().strftime("%Y_%m_%d")  + ".csv"
+        self.export_log_file_name = "TrialLog_" + self.subject_ID + "_" + self.selected_trial_group + "_" + self.session + "_" + datetime.datetime.now().strftime("%Y_%m_%d")  + ".csv"
 
-        # TODO: Make second panel apear saying experiment beginning
-
-        #create the frame
-        self.experiment_frame = customtkinter.CTkFrame(self)
-        self.experiment_frame.grid(row=0, column=3, columnspan = 2, rowspan = 2, padx=(20, 0), pady=(10, 10), sticky="nsew")
-        self.experiment_frame.rowconfigure((0,3), weight = 1)
-        self.experiment_frame.columnconfigure((0,3), weight = 1)
-        self.beginning_experiment_text = customtkinter.CTkLabel(self.experiment_frame, text="Starting Experiment In:")
+        # Begin a countdown to starting the experiment
+        self.beginning_experiment_text = customtkinter.CTkLabel(self.experiment_frame, text="Starting Experiment In:", font = ('CTkFont',50))
         self.beginning_experiment_text.grid(row=1, column = 1)
 
         # Schedule the update of the text after 1000 milliseconds (1 second)
         self.experiment_frame.after(1000, lambda: self.beginning_experiment_text.configure(text="3"))
         self.experiment_frame.after(2000, lambda: self.beginning_experiment_text.configure(text="2"))
         self.experiment_frame.after(3000, lambda: self.beginning_experiment_text.configure(text="1"))
-        self.experiment_frame.after(4000, lambda: self.beginning_experiment_text.configure(text=""))
+        self.experiment_frame.after(4000, lambda: self.beginning_experiment_text.destroy())
 
+        # Call the method to start the experiment after countdown
+        self.experiment_frame.after(5000, lambda: self.run_trial(0))
 
-        # TODO: Begin experiment
+    def run_trial(self, trial_index):
+        if trial_index >= len(self.trial_list):
+            self.export_log()
+            return # All trials have been completed
+        
+        trial = self.trial_list[trial_index]
+        delay = random.uniform(3, 7) # Generate a random delay between 3 and 7 seconds
 
+        # Use after() to schedule the vibration sending after the delay
+        self.experiment_frame.after(int(delay * 1000), lambda: self.send_vibration(trial, self.trial_dict))
 
-
+        # Create buttons and wait for a response from the user
+        self.experiment_frame.after(int((delay + 1) * 1000), lambda: self.create_buttons_and_wait_for_response(trial_index))
 
     def vibration_demo(self):
         self.vibration_demo_popup = VibrationDemoPopup(self)
-
 
     def export_log(self):
         print("exporting log")
@@ -191,15 +192,61 @@ class App(customtkinter.CTk):
         # Need to figure out how to append data in real time so that you can continuously update throughout the study.
 
     def send_vibration(self, notification_type, trial_dict):
-        print(notification_type)
-        # print(vibration_patterns.iPhone[notification_type])
+        # print(notification_type)
         for i in trial_dict[notification_type]:
             # TODO: Send i[1] over serial to arduino. Make sure to have a try except for if it cannot reach the arduino. Have a popup that allows you to save results if it gets cutoff mid study.
-            print(i[1])
-            time.sleep(i[0]/1000)
+            print("Send '" + str(i[1]) + "' to arduino over serial")
+            self.experiment_frame.after(i[0])
+
+
+    def create_trials(self, string_list, x):
+        # Calculate the base number of repetitions for each string
+        base_repetitions = x // len(string_list)
+        
+        # Calculate the remainder (extra strings to distribute)
+        remainder = x % len(string_list)
+        
+        # Create a list where each string appears `base_repetitions` times
+        trials = [s for s in string_list for _ in range(base_repetitions)]
+        
+        # Add one extra occurrence of some strings to handle the remainder
+        trials.extend(string_list[:remainder])
+
+        # Shuffle the list to randomize the order
+        random.shuffle(trials)
+
+        return trials
+
+    def create_buttons_and_wait_for_response(self, trial_index):
+
+        # Remove any previous buttons from the list
+        for button in self.buttons_list:
+            button.destroy()
+        
+        #clear the list
+        self.buttons_list = []
+
+        # Ensure the dictionary exists
+        if self.trial_dict is not None:
+            for i in self.trial_dict.keys():
+                button = customtkinter.CTkButton(self.experiment_frame, text=i, command=lambda i=i: self.on_button_click(trial_index, i))
+                button.pack(pady=10)
+                self.buttons_list.append(button)  # Add button to the list
+        else:
+            print(f"Error: '{self.trial_dict}' is not a valid attribute in vibration_patterns.")
 
 
 
+    def on_button_click(self, trial_index, button_text):
+        # Handle the button click and proceed to the next trial
+        print(f"User clicked: {button_text}")
+
+        # Remove the buttons
+        for button in self.buttons_list:
+            button.destroy()
+
+        # Proceed to the next trial after a short delay
+        self.experiment_frame.after(500, self.run_trial, trial_index + 1)
     
 
 
@@ -215,7 +262,7 @@ class VibrationDemoPopup(customtkinter.CTkToplevel):
 
         # set size and title of popup
         self.geometry("400x500")
-        self.title("Add Trial")
+        self.title("Vibrations Demo")
 
         # Add a label
         self.label = customtkinter.CTkLabel(self, text="Select a Vibration Tone:", font=("Arial", 18))
@@ -227,8 +274,6 @@ class VibrationDemoPopup(customtkinter.CTkToplevel):
 
         #initialize empty button list
         self.buttons_list = []
-
-        
 
         # Add a cancel button to the popup
         self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
@@ -262,12 +307,6 @@ class VibrationDemoPopup(customtkinter.CTkToplevel):
         self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
         self.cancel_button.pack(pady=(30,10))
         self.buttons_list.append(self.cancel_button) # add to button list
-
-
-    def send_vibration(self):
-        # send the vibration to the esp with serial
-        print("Sending Vibration")
-
 
 
 if __name__ == "__main__":
