@@ -3,7 +3,8 @@ import tkinter.messagebox
 import customtkinter
 import datetime
 import time
-
+import vibration_patterns
+import inspect
 
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -41,7 +42,7 @@ class App(customtkinter.CTk):
 
         #create the frame
         self.begin_experiment_frame = customtkinter.CTkFrame(self)
-        self.begin_experiment_frame.grid(row=0, column=1, columnspan = 2, padx=(20, 0), pady=(10, 0), sticky="nsew")
+        self.begin_experiment_frame.grid(row=0, column=1, columnspan = 2, rowspan = 2, padx=(20, 0), pady=(10, 10), sticky="nsew")
         self.begin_experiment_frame.rowconfigure(4, weight = 1)
 
         #add label at top of frame
@@ -54,11 +55,22 @@ class App(customtkinter.CTk):
         self.ID_entry = customtkinter.CTkEntry(self.begin_experiment_frame, placeholder_text="Subject ID")
         self.ID_entry.grid(row=1, column=1, padx=(20, 20), pady=(10), sticky="nsew")
 
-        # Add phone type dropbox (iPhone or Android)
-        self.phone_selection_label = customtkinter.CTkLabel(self.begin_experiment_frame, text = "Phone Type:")
-        self.phone_selection_label.grid(row = 2, column = 0, padx = 20, pady = 10, sticky ="nsew")
-        self.phone_selection_dropdown = customtkinter.CTkComboBox(self.begin_experiment_frame, values=["iPhone", "Android"], state="readonly")
-        self.phone_selection_dropdown.grid (row = 2, column = 1, padx = 20, pady = 10, sticky= "nsew")
+        # Get a list of all the collections of vibration types found in vibration_patterns
+        self.trial_groups = [name for name, obj in inspect.getmembers(vibration_patterns) 
+              if isinstance(obj, dict) and not name.startswith('__')]
+        
+        # add a trial group dropdown
+        self.trial_group_label = customtkinter.CTkLabel(self.begin_experiment_frame, text = "Trial Group")
+        self.trial_group_label.grid(row = 2, column = 0, padx = 20, pady = 10, sticky ="nsew")
+        self.trial_group_dropdown = customtkinter.CTkComboBox(self.begin_experiment_frame, values=self.trial_groups, state="readonly")
+        self.trial_group_dropdown.grid (row = 2, column = 1, padx = 20, pady = 10, sticky= "nsew")
+
+
+        # Add session dropbox (in pocket or in hand)
+        self.session_selection_label = customtkinter.CTkLabel(self.begin_experiment_frame, text = "Session Type:")
+        self.session_selection_label.grid(row = 3, column = 0, padx = 20, pady = 10, sticky ="nsew")
+        self.session_selection_dropdown = customtkinter.CTkComboBox(self.begin_experiment_frame, values=["Pocket", "Hand"], state="readonly")
+        self.session_selection_dropdown.grid (row = 3, column = 1, padx = 20, pady = 10, sticky= "nsew")
 
         #TODO: Maybe add other parameters, age, Height, Weight, etc. Any other info you want in the header.
 
@@ -74,6 +86,7 @@ class App(customtkinter.CTk):
         # Set empty variables to fill later
         self.subject_ID = None
         self.phone_type = None
+        self.selected_trial_group = None
  
 
         self.current_trial = None
@@ -113,11 +126,18 @@ class App(customtkinter.CTk):
             # TODO: add a popup here taht says "Please enter Subject ID"
             return
         
-
-        if self.phone_selection_dropdown.get() != "":
-            self.phone_type = self.phone_selection_dropdown.get()
+        if self.trial_group_dropdown.get() != "":
+            self.selected_trial_group = self.trial_group_dropdown.get()
         else:
-            print("Must select phone type")
+            print("Must select trial group")
+            # TODO: add popup
+            return
+        
+
+        if self.session_selection_dropdown.get() != "":
+            self.phone_type = self.session_selection_dropdown.get()
+        else:
+            print("Must select session type")
             # TODO: Add a popup here
             return
 
@@ -130,7 +150,8 @@ class App(customtkinter.CTk):
 
         # Disable the experiment setup pane so that you cannot change these values
         self.ID_entry.configure(state = "disabled")
-        self.phone_selection_dropdown.configure(state = "disabled")
+        self.trial_group_dropdown.configure(state = "disabled")
+        self.session_selection_dropdown.configure(state = "disabled")
         self.begin_experiment_button.configure(state = "disabled")
         self.vibration_demo_button.configure(state = "disabled")
 
@@ -141,28 +162,44 @@ class App(customtkinter.CTk):
 
         #create the frame
         self.experiment_frame = customtkinter.CTkFrame(self)
-        self.experiment_frame.grid(row=0, column=3, columnspan = 2, padx=(20, 0), pady=(10, 0), sticky="nsew")
+        self.experiment_frame.grid(row=0, column=3, columnspan = 2, rowspan = 2, padx=(20, 0), pady=(10, 10), sticky="nsew")
         self.experiment_frame.rowconfigure((0,3), weight = 1)
         self.experiment_frame.columnconfigure((0,3), weight = 1)
-        self.beginning_experiment_text = customtkinter.CTkLabel(self.experiment_frame, text="Starting Experiment")
+        self.beginning_experiment_text = customtkinter.CTkLabel(self.experiment_frame, text="Starting Experiment In:")
         self.beginning_experiment_text.grid(row=1, column = 1)
+
+        # Schedule the update of the text after 1000 milliseconds (1 second)
+        self.experiment_frame.after(1000, lambda: self.beginning_experiment_text.configure(text="3"))
+        self.experiment_frame.after(2000, lambda: self.beginning_experiment_text.configure(text="2"))
+        self.experiment_frame.after(3000, lambda: self.beginning_experiment_text.configure(text="1"))
+        self.experiment_frame.after(4000, lambda: self.beginning_experiment_text.configure(text=""))
 
 
         # TODO: Begin experiment
 
 
 
+
     def vibration_demo(self):
         self.vibration_demo_popup = VibrationDemoPopup(self)
 
-    def remove_trial(self):
-        self.remove_trial_popup = RemoveTrialPopup(self)
 
     def export_log(self):
         print("exporting log")
         # TODO: Get directory from settings and file name from attribute
         # Determine if file exists
         # Need to figure out how to append data in real time so that you can continuously update throughout the study.
+
+    def send_vibration(self, notification_type, trial_dict):
+        print(notification_type)
+        # print(vibration_patterns.iPhone[notification_type])
+        for i in trial_dict[notification_type]:
+            # TODO: Send i[1] over serial to arduino. Make sure to have a try except for if it cannot reach the arduino. Have a popup that allows you to save results if it gets cutoff mid study.
+            print(i[1])
+            time.sleep(i[0]/1000)
+
+
+
     
 
 
@@ -185,34 +222,47 @@ class VibrationDemoPopup(customtkinter.CTkToplevel):
         self.label.pack(pady=(20,10))
 
         # Select phone type
-        self.phone_selection = customtkinter.CTkComboBox(self, values=["iPhone", "Android"], state="readonly")
-        self.phone_selection.pack(pady=10)
+        self.dictionary_selection = customtkinter.CTkComboBox(self, values=self.main.trial_groups, state="readonly", command=self.create_buttons)
+        self.dictionary_selection.pack(pady=10)
 
+        #initialize empty button list
+        self.buttons_list = []
 
-        # Add a "Text" button to the popup
-        self.add_button = customtkinter.CTkButton(self, text="Text Message")
-        self.add_button.pack(pady=10)
-
-        # Add an "Email" button to the popup
-        self.add_button = customtkinter.CTkButton(self, text="Email")
-        self.add_button.pack(pady=10)
-
-        # Add an "Groupme" button to the popup
-        self.add_button = customtkinter.CTkButton(self, text="GroupMe")
-        self.add_button.pack(pady=10)
-
-        # Add an "WhatsApp" button to the popup
-        self.add_button = customtkinter.CTkButton(self, text="WhatsApp")
-        self.add_button.pack(pady=10)
         
 
         # Add a cancel button to the popup
         self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
         self.cancel_button.pack(pady=(30,10))
+        self.buttons_list.append(self.cancel_button) # add to button list
         
         # Make sure the popup is modal (disables main window interaction)
         self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
         # self.transient(self.main) # set to be on top of the main window
+
+    def create_buttons(self, trial_group):
+        for i in self.buttons_list:
+            i.destroy()
+        
+        #clear the list
+        self.buttons_list = []
+
+        # Dynamically access the dictionary using the trial_group string
+        trial_dict = getattr(vibration_patterns, trial_group, None)
+
+        # Ensure the dictionary exists
+        if trial_dict is not None:
+            for i in trial_dict.keys():
+                button = customtkinter.CTkButton(self, text=i, command=lambda i=i: self.main.send_vibration(i, trial_dict))
+                button.pack(pady=10)
+                self.buttons_list.append(button)  # Add button to the list
+        else:
+            print(f"Error: '{trial_group}' is not a valid attribute in vibration_patterns.")
+
+        # Regenerate the cancel button
+        self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
+        self.cancel_button.pack(pady=(30,10))
+        self.buttons_list.append(self.cancel_button) # add to button list
+
 
     def send_vibration(self):
         # send the vibration to the esp with serial
