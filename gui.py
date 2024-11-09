@@ -3,6 +3,9 @@ import datetime
 import vibration_patterns
 import inspect
 import random
+import serial
+import atexit
+import time
 
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -91,6 +94,26 @@ class App(customtkinter.CTk):
         self.session = None
  
         self.buttons_list = []
+
+        # establish serial communication with Arduino
+        self.com_port = "COM9"
+        self.baud_rate = 9600
+
+        # TODO: Maybe think about moving this to the begin experiment button rather than on startup
+        # You would then have to figure out how to handle the demos though
+        try:
+            self.ser = serial.Serial(self.com_port, self.baud_rate)
+        except serial.SerialException as e:
+            print(f"Error opening serial port: {e}")
+            exit()
+
+        #ensure that serial connection is properly closed when GUI is closed
+        atexit.register(self.cleanup)
+
+    def cleanup(self):
+        self.ser.close()
+        print("Serial Connection Closed")
+
 
 
     def open_settings_menu(self):
@@ -194,9 +217,18 @@ class App(customtkinter.CTk):
     def send_vibration(self, notification_type, trial_dict):
         # print(notification_type)
         for i in trial_dict[notification_type]:
-            # TODO: Send i[1] over serial to arduino. Make sure to have a try except for if it cannot reach the arduino. Have a popup that allows you to save results if it gets cutoff mid study.
-            print("Send '" + str(i[1]) + "' to arduino over serial")
-            self.experiment_frame.after(i[0])
+            
+            # Try to send data to arduino
+            try:
+                self.ser.write(bytes([i[1]]))  # Send each value as a single byte
+            except serial.SerialException as e:
+                print(f"Serial error: {e}")
+                # TODO: Add a popup telling you what happened and allowing you to save results before study ends. Maybe allow you to attempt to reconnect?
+                # Need to either make this end the actual study, or give you a change to reconnect and reopen the serial port
+                self.cleanup()
+                break
+            # print("Send '" + str(i[1]) + "' to arduino over serial")
+            time.sleep(i[0]/1000)
 
 
     def create_trials(self, string_list, x):

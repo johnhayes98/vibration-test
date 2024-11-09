@@ -6,7 +6,7 @@ Both should be a single byte ranging from 0 to 255.
 '''
 
 iPhone = {
-    "iMessage": [[255, 255], [100, 0], [255, 255], [0, 0]],
+    "iMessage": [[255, 255], [50, 0], [255, 255], [0, 0]],
     "Email": [[135,200], [0,0]],
     "WhatsApp": [[100,200], [0,0]],
     "None": [[0,0]]
