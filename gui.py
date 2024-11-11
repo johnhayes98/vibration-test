@@ -9,6 +9,7 @@ import time
 import pandas as pd
 from tkinter import filedialog
 import os
+from serial.tools import list_ports
 
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -104,20 +105,23 @@ class App(customtkinter.CTk):
         self.com_port = "COM9"
         self.baud_rate = 9600
 
-        # TODO: Maybe think about moving this to the begin experiment button rather than on startup
-        # You would then have to figure out how to handle the demos though
+        self.establish_serial_com()
+        #ensure that serial connection is properly closed when GUI is closed
+        atexit.register(self.cleanup)
+
+    def establish_serial_com(self):
         try:
             self.ser = serial.Serial(self.com_port, self.baud_rate)
         except serial.SerialException as e:
             print(f"Error opening serial port: {e}")
-            exit()
-
-        #ensure that serial connection is properly closed when GUI is closed
-        atexit.register(self.cleanup)
+            popup = COMPortSelectorPopup(self)
 
     def cleanup(self):
-        self.ser.close()
-        print("Serial Connection Closed")
+        try:
+            self.ser.close()
+            print("Serial Connection Closed")
+        except AttributeError as e:
+            print(e)
 
     def open_settings_menu(self):
         self.settingsMenu = SettingsMenu(self)
@@ -453,6 +457,67 @@ class MessagePopup(customtkinter.CTkToplevel):
         '''Close the window and set grab_set() to appropriate precursor window'''
         self.main.grab_set()
         self.destroy()
+
+class COMPortSelectorPopup(customtkinter.CTkToplevel):
+    def __init__(self, main):
+        super().__init__()
+
+        # make the main window an attribute of the popup so that it can access attributes of main window
+        self.main = main
+
+        # set size and title of popup
+        self.geometry("450x275")
+        self.title("Select COM Port")
+
+        self.protocol('WM_DELETE_WINDOW', exit)
+
+        #initialize empty COM Port List
+        self.COMPortList = []
+
+        self.getCOMPorts()
+
+        # Add the message
+        self.message = customtkinter.CTkLabel(self, text="Select COM Port for Arduino Nano")
+        self.message.pack(pady=10)
+
+        # Select com port
+        self.COMPort_selection = customtkinter.CTkComboBox(self, values=self.COMPortList, state="readonly")
+        self.COMPort_selection.pack(pady=10)
+
+        # Add a "Refresh List"  button to the popup
+        self.refresh_list_button = customtkinter.CTkButton(self, text="Refresh List", command=self.refreshList)
+        self.refresh_list_button.pack(pady=10)
+
+        # Add Select button
+        self.select_button = customtkinter.CTkButton(self, text="Select", command=self.selectCOM)
+        self.select_button.pack(pady=10)
+
+        # Add Cancel button
+        self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=exit)
+        self.cancel_button.pack(pady=10)
+
+        # Make sure the popup is modal (disables main window interaction)
+        self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
+        # self.transient(self.main) # set to be on top of the main window
+
+    def getCOMPorts(self):
+        # Now you can use list_ports to get available COM ports
+        ports = list_ports.comports()
+        self.COMPortList = [port.device for port in ports]
+
+    def refreshList(self):
+        self.getCOMPorts()
+        self.COMPort_selection.configure(values=self.COMPortList)
+    
+    def selectCOM(self):
+        self.main.com_port = self.COMPort_selection.get()
+        self.destroy()
+        self.main.establish_serial_com()
+
+
+
+
+
 
 if __name__ == "__main__":
     app = App()
