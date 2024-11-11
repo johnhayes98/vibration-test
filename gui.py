@@ -6,6 +6,9 @@ import random
 import serial
 import atexit
 import time
+import pandas as pd
+from tkinter import filedialog
+import os
 
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -37,7 +40,6 @@ class App(customtkinter.CTk):
         self.settings_button = customtkinter.CTkButton(self.sidebar_frame, command=self.open_settings_menu, text="Settings")
         self.settings_button.grid(row=8, column=0, padx=20, pady=10)
 
-
         ##################################################################################################################
         #  This creates the experiment frame which allows you to input the subject ID, phone type, etc
 
@@ -66,7 +68,6 @@ class App(customtkinter.CTk):
         self.trial_group_dropdown = customtkinter.CTkComboBox(self.begin_experiment_frame, values=self.trial_groups, state="readonly")
         self.trial_group_dropdown.grid (row = 2, column = 1, padx = 20, pady = 10, sticky= "nsew")
 
-
         # Add session dropbox (in pocket or in hand)
         self.session_selection_label = customtkinter.CTkLabel(self.begin_experiment_frame, text = "Session Type:")
         self.session_selection_label.grid(row = 3, column = 0, padx = 20, pady = 10, sticky ="nsew")
@@ -86,14 +87,18 @@ class App(customtkinter.CTk):
         self.experiment_frame.columnconfigure((0,3), weight = 1)
 
         # Set default values
-        self.number_of_trials = 80 # TODO: Need to make this configurable in the settings menu
+        self.number_of_trials = 40 # TODO: Need to make this configurable in the settings menu
 
         # Set empty variables to fill later
         self.subject_ID = None
         self.selected_trial_group = None
         self.session = None
+        self.export_results_directory = None
  
         self.buttons_list = []
+
+        # create an empty dataframe to store results
+        self.results = pd.DataFrame(columns = ["ID", "Trial Group", "Session", "Ground Truth", "Response"])
 
         # establish serial communication with Arduino
         self.com_port = "COM9"
@@ -114,26 +119,9 @@ class App(customtkinter.CTk):
         self.ser.close()
         print("Serial Connection Closed")
 
-
-
     def open_settings_menu(self):
         print("Open the settings menu")
-        #TODO: Create a settings menu class that opens a separate popup
-
-        
-        # TODO: Make a Settings Menu Class that contains these items as well as the directories and saves them to a .txt file
-        # self.appearance_mode_label = customtkinter.CTkLabel(self.sidebar_frame, text="Appearance Mode:", anchor="w")
-        # self.appearance_mode_label.grid(row=5, column=0, padx=20, pady=(10, 0))
-        # self.appearance_mode_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["Light", "Dark", "System"],
-        #                                                                command=self.change_appearance_mode_event)
-        # self.appearance_mode_optionemenu.grid(row=6, column=0, padx=20, pady=(10, 10))
-        # self.scaling_label = customtkinter.CTkLabel(self.sidebar_frame, text="UI Scaling:", anchor="w")
-        # self.scaling_label.grid(row=7, column=0, padx=20, pady=(10, 0))
-        # self.scaling_optionemenu = customtkinter.CTkOptionMenu(self.sidebar_frame, values=["80%", "90%", "100%", "110%", "120%"],
-        #                                                        command=self.change_scaling_event)
-        # self.scaling_optionemenu.grid(row=8, column=0, padx=20, pady=(10, 20))
-
-        #settings should also contain a default value for number of trials for a training session
+        self.settingsMenu = SettingsMenu(self)
 
     def begin_experiment(self):
 
@@ -160,6 +148,11 @@ class App(customtkinter.CTk):
         else:
             print("Must select session type")
             # TODO: Add a popup here
+            return
+        
+        if self.export_results_directory is None:
+            print("Set directory to save results in settings menu")
+            # TODO: add a popup
             return
 
         # Dynamically access the dictionary using the trial_group string
@@ -210,9 +203,9 @@ class App(customtkinter.CTk):
 
     def export_log(self):
         print("exporting log")
-        # TODO: Get directory from settings and file name from attribute
-        # Determine if file exists
-        # Need to figure out how to append data in real time so that you can continuously update throughout the study.
+        print(self.results)
+        file_path = os.path.join(self.export_results_directory, self.export_log_file_name)
+        self.results.to_csv(file_path, index=False)
 
     def send_vibration(self, notification_type, trial_dict):
         # print(notification_type)
@@ -272,6 +265,9 @@ class App(customtkinter.CTk):
     def on_button_click(self, trial_index, button_text):
         # Handle the button click and proceed to the next trial
         print(f"User clicked: {button_text}")
+
+        # add trial to log
+        self.results.loc[len(self.results)] = [self.subject_ID, self.selected_trial_group, self.session, self.trial_list[trial_index], button_text]
 
         # Remove the buttons
         for button in self.buttons_list:
@@ -339,6 +335,92 @@ class VibrationDemoPopup(customtkinter.CTkToplevel):
         self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
         self.cancel_button.pack(pady=(30,10))
         self.buttons_list.append(self.cancel_button) # add to button list
+
+class SettingsMenu(customtkinter.CTkToplevel):
+    '''
+    A popup to allow you to change settings
+    '''
+    def __init__(self, main):
+        super().__init__()
+
+        # make the main window an attribute of the popup so that it can access attributes of main window
+        self.main = main
+
+        # set size and title of popup
+        self.geometry("450x275")
+        self.title("Settings")
+
+        # Number of Trials
+        self.number_of_trials_label = customtkinter.CTkLabel(self, text="Number Of Trials:")
+        self.number_of_trials_label.grid(row=0, column=0, padx=10, pady=20)
+
+        self.number_of_trials_entry = customtkinter.CTkEntry(self)
+        self.number_of_trials_entry.insert(0, self.main.number_of_trials)
+        self.number_of_trials_entry.grid(row=0, column=1, padx=10, pady=20)
+
+        # Directory to save results file
+        self.data_export_directory_label = customtkinter.CTkLabel(self, text = "Save Results to:")
+        self.data_export_directory_label.grid(row=1, column=0, padx=10, pady=20)
+
+        self.data_export_directory_entry = customtkinter.CTkEntry(self)
+        self.data_export_directory_entry.grid(row=1, column=1, padx=10, pady=20)
+        
+        self.select_data_export_directory_button = customtkinter.CTkButton(self, text="...", width=10, command= lambda: self.select_directory(self.data_export_directory_entry))
+        self.select_data_export_directory_button.grid(row=1, column =2, padx=0, pady=20)
+
+
+        # Add a save button to the popup
+        self.save_button = customtkinter.CTkButton(self, text="Save", command=self.save_settings)
+        self.save_button.grid(row = 3, column = 0, padx = 20, pady = 20)
+
+        # Add a cancel button to the popup
+        self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
+        self.cancel_button.grid(row = 3, column = 1, padx = 20, pady = 20)
+
+
+
+        # Make sure the popup is modal (disables main window interaction)
+        self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
+        # self.transient(self.main) # set to be on top of the main window
+
+    def select_directory(self, directory_entry):
+
+        file_path = filedialog.askdirectory(title="Select Folder:", mustexist=True)
+
+        if file_path:
+            directory_entry.delete(0, customtkinter.END) 
+            directory_entry.insert(0, file_path)
+        else:
+            print("No folder chosen")
+
+
+    def save_settings(self):
+        print("Apply settings to main gui")
+        '''
+        for each setting, change the corresponding GUI variable to the new value
+        set in the settings menu.
+
+        Raise an error if data is wrong type before applying
+        
+        
+        '''
+        try:
+            self.main.number_of_trials = int(self.number_of_trials_entry.get())
+        except ValueError:
+            print("Number of Trials must be an integer")
+            # TODO: add a popup
+            return
+        
+        if os.path.exists(self.data_export_directory_entry.get()):
+            self.main.export_results_directory = self.data_export_directory_entry.get()
+        else:
+            print("Not a valid directory")
+            # TODO: add a popup
+            return
+
+
+        # close the settings popup
+        self.destroy()
 
 
 if __name__ == "__main__":
