@@ -87,7 +87,7 @@ class App(customtkinter.CTk):
         self.experiment_frame.columnconfigure((0,3), weight = 1)
 
         # Set default values
-        self.number_of_trials = 40 # TODO: Need to make this configurable in the settings menu
+        self.number_of_trials = 40
 
         # Set empty variables to fill later
         self.subject_ID = None
@@ -120,7 +120,6 @@ class App(customtkinter.CTk):
         print("Serial Connection Closed")
 
     def open_settings_menu(self):
-        print("Open the settings menu")
         self.settingsMenu = SettingsMenu(self)
 
     def begin_experiment(self):
@@ -131,28 +130,28 @@ class App(customtkinter.CTk):
         if self.ID_entry.get() != "":
             self.subject_ID = self.ID_entry.get()
         else:
-            print("Must provide ID.")
-            # TODO: add a popup here taht says "Please enter Subject ID"
+            text = "Please enter subject ID."
+            popup = MessagePopup(self, text)
             return
         
         if self.trial_group_dropdown.get() != "":
             self.selected_trial_group = self.trial_group_dropdown.get()
         else:
-            print("Must select trial group")
-            # TODO: add popup
+            text = "Please select trial group."
+            popup = MessagePopup(self, text)
             return
         
 
         if self.session_selection_dropdown.get() != "":
             self.session = self.session_selection_dropdown.get()
         else:
-            print("Must select session type")
-            # TODO: Add a popup here
+            text = "Please select session type."
+            popup = MessagePopup(self, text)
             return
         
         if self.export_results_directory is None:
-            print("Set directory to save results in settings menu")
-            # TODO: add a popup
+            text = "Set directory to save results file in settings menu"
+            popup = MessagePopup(self, text)
             return
 
         # Dynamically access the dictionary using the trial_group string
@@ -202,13 +201,16 @@ class App(customtkinter.CTk):
         self.vibration_demo_popup = VibrationDemoPopup(self)
 
     def export_log(self):
-        print("exporting log")
-        print(self.results)
         file_path = os.path.join(self.export_results_directory, self.export_log_file_name)
         self.results.to_csv(file_path, index=False)
+        message = "Experiment Complete! Results saved to:\n" + file_path.replace('\\', '/')
+        popup = MessagePopup(self, message)
+        popup.geometry("700x275")
+        popup.title("Experiment Complete!")
+
+        print("Results saved to: " + file_path)
 
     def send_vibration(self, notification_type, trial_dict):
-        # print(notification_type)
         for i in trial_dict[notification_type]:
             
             # Try to send data to arduino
@@ -217,7 +219,7 @@ class App(customtkinter.CTk):
             except serial.SerialException as e:
                 print(f"Serial error: {e}")
                 # TODO: Add a popup telling you what happened and allowing you to save results before study ends. Maybe allow you to attempt to reconnect?
-                # Need to either make this end the actual study, or give you a change to reconnect and reopen the serial port
+                # Need to either make this end the actual study, or give you a chance to reconnect and reopen the serial port
                 self.cleanup()
                 break
             # print("Send '" + str(i[1]) + "' to arduino over serial")
@@ -264,7 +266,7 @@ class App(customtkinter.CTk):
 
     def on_button_click(self, trial_index, button_text):
         # Handle the button click and proceed to the next trial
-        print(f"User clicked: {button_text}")
+        # print(f"User clicked: {button_text}")
 
         # add trial to log
         self.results.loc[len(self.results)] = [self.subject_ID, self.selected_trial_group, self.session, self.trial_list[trial_index], button_text]
@@ -395,7 +397,6 @@ class SettingsMenu(customtkinter.CTkToplevel):
 
 
     def save_settings(self):
-        print("Apply settings to main gui")
         '''
         for each setting, change the corresponding GUI variable to the new value
         set in the settings menu.
@@ -407,21 +408,51 @@ class SettingsMenu(customtkinter.CTkToplevel):
         try:
             self.main.number_of_trials = int(self.number_of_trials_entry.get())
         except ValueError:
-            print("Number of Trials must be an integer")
-            # TODO: add a popup
+            text = "Number of Trials must be an integer"
+            popup = MessagePopup(self, text)
             return
         
         if os.path.exists(self.data_export_directory_entry.get()):
             self.main.export_results_directory = self.data_export_directory_entry.get()
         else:
-            print("Not a valid directory")
-            # TODO: add a popup
+            text = "The directory provided is not valid. Please provide a valid directory."
+            popup = MessagePopup(self, text)
             return
 
 
         # close the settings popup
         self.destroy()
 
+
+class MessagePopup(customtkinter.CTkToplevel):
+    '''
+    A popup to allow you to provide a message
+    '''
+    def __init__(self, main, message):
+        super().__init__()
+
+        # make the main window an attribute of the popup so that it can access attributes of main window
+        self.main = main
+
+        # set size and title of popup
+        self.geometry("450x275")
+        self.title("Error")
+
+        self.message = customtkinter.CTkLabel(self, text=message)
+        self.message.pack(pady=10)
+
+        # Add an "OK"  button to the popup
+        self.cancel_button = customtkinter.CTkButton(self, text="OK", command=self.closeWindow)
+        self.cancel_button.pack(pady=10)
+
+        # Make sure the popup is modal (disables main window interaction)
+        self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
+        # self.transient(self.main) # set to be on top of the main window
+
+    def closeWindow(self):
+        '''Close the window and set grab_set() to appropriate precursor window'''
+        self.main.grab_set()
+        self.destroy()
 
 if __name__ == "__main__":
     app = App()
