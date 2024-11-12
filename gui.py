@@ -98,9 +98,6 @@ class App(customtkinter.CTk):
  
         self.buttons_list = []
 
-        # create an empty dataframe to store results
-        self.results = pd.DataFrame(columns = ["ID", "Trial Group", "Session", "Ground Truth", "Response"])
-
         # establish serial communication with Arduino
         self.com_port = "COM9"
         self.baud_rate = 9600
@@ -158,6 +155,9 @@ class App(customtkinter.CTk):
             popup = MessagePopup(self, text)
             return
 
+        # create an empty dataframe to store results (this is created at the start of each trial)
+        self.results = pd.DataFrame(columns = ["ID", "Trial Group", "Session", "Ground Truth", "Response", "Inter Stimulus Delay (ms)"])
+
         # Dynamically access the dictionary using the trial_group string
         self.trial_dict = getattr(vibration_patterns, self.trial_group_dropdown.get(), None)
 
@@ -172,7 +172,7 @@ class App(customtkinter.CTk):
         self.vibration_demo_button.configure(state = "disabled")
 
         # Generate the name of the log file (.txt or .csv) for that experiment and store it as an attribute (ID_date_{training or testing})
-        self.export_log_file_name = "TrialLog_" + self.subject_ID + "_" + self.selected_trial_group + "_" + self.session + "_" + datetime.datetime.now().strftime("%Y_%m_%d")  + ".csv"
+        self.export_log_file_name = "TrialLog_" + self.subject_ID + "_" + self.selected_trial_group + "_" + self.session + "_" + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")  + ".csv"
 
         # Begin a countdown to starting the experiment
         self.beginning_experiment_text = customtkinter.CTkLabel(self.experiment_frame, text="Starting Experiment In:", font = ('CTkFont',50))
@@ -193,13 +193,13 @@ class App(customtkinter.CTk):
             return # All trials have been completed
         
         trial = self.trial_list[trial_index]
-        delay = random.uniform(3, 7) # Generate a random delay between 3 and 7 seconds
+        self.delay = random.uniform(3, 7) # Generate a random delay between 3 and 7 seconds
 
         # Use after() to schedule the vibration sending after the delay
-        self.experiment_frame.after(int(delay * 1000), lambda: self.send_vibration(trial, self.trial_dict))
+        self.experiment_frame.after(int(self.delay * 1000), lambda: self.send_vibration(trial, self.trial_dict))
 
         # Create buttons and wait for a response from the user
-        self.experiment_frame.after(int((delay + 1) * 1000), lambda: self.create_buttons_and_wait_for_response(trial_index))
+        self.experiment_frame.after(int((self.delay + 1) * 1000), lambda: self.create_buttons_and_wait_for_response(trial_index))
 
     def vibration_demo(self):
         self.vibration_demo_popup = VibrationDemoPopup(self)
@@ -208,9 +208,8 @@ class App(customtkinter.CTk):
         file_path = os.path.join(self.export_results_directory, self.export_log_file_name)
         self.results.to_csv(file_path, index=False)
         message = "Experiment Complete! Results saved to:\n" + file_path.replace('\\', '/')
-        popup = MessagePopup(self, message)
-        popup.geometry("700x275")
-        popup.title("Experiment Complete!")
+
+        popup = ExperimentCompletePopup(self, message)
 
         print("Results saved to: " + file_path)
 
@@ -273,7 +272,7 @@ class App(customtkinter.CTk):
         # print(f"User clicked: {button_text}")
 
         # add trial to log
-        self.results.loc[len(self.results)] = [self.subject_ID, self.selected_trial_group, self.session, self.trial_list[trial_index], button_text]
+        self.results.loc[len(self.results)] = [self.subject_ID, self.selected_trial_group, self.session, self.trial_list[trial_index], button_text, int(self.delay * 1000)]
 
         # Remove the buttons
         for button in self.buttons_list:
@@ -369,6 +368,8 @@ class SettingsMenu(customtkinter.CTkToplevel):
         self.data_export_directory_label.grid(row=1, column=0, padx=10, pady=20)
 
         self.data_export_directory_entry = customtkinter.CTkEntry(self)
+        if self.main.export_results_directory is not None:
+            self.data_export_directory_entry.insert(0, self.main.export_results_directory)
         self.data_export_directory_entry.grid(row=1, column=1, padx=10, pady=20)
         
         self.select_data_export_directory_button = customtkinter.CTkButton(self, text="...", width=10, command= lambda: self.select_directory(self.data_export_directory_entry))
@@ -457,6 +458,44 @@ class MessagePopup(customtkinter.CTkToplevel):
         '''Close the window and set grab_set() to appropriate precursor window'''
         self.main.grab_set()
         self.destroy()
+
+
+class ExperimentCompletePopup(customtkinter.CTkToplevel):
+
+    def __init__(self, main, message):
+        super().__init__()
+
+        # make the main window an attribute of the popup so that it can access attributes of main window
+        self.main = main
+
+        # set size and title of popup
+        self.geometry("800x275")
+        self.title("Experiment Complete!")
+
+        self.protocol('WM_DELETE_WINDOW', self.closeWindow)
+
+        self.message = customtkinter.CTkLabel(self, text=message)
+        self.message.pack(pady=10)
+
+        # Add an "OK"  button to the popup
+        self.cancel_button = customtkinter.CTkButton(self, text="OK", command=self.closeWindow)
+        self.cancel_button.pack(pady=10)
+
+        # Make sure the popup is modal (disables main window interaction)
+        self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
+        # self.transient(self.main) # set to be on top of the main window
+
+    def closeWindow(self):
+        '''Resets the GUI for another trial'''
+        self.main.grab_set()
+        self.destroy()
+
+        #reset the main GUI for another trial
+        self.main.ID_entry.configure(state = "normal")
+        self.main.trial_group_dropdown.configure(state = "normal")
+        self.main.session_selection_dropdown.configure(state = "normal")
+        self.main.begin_experiment_button.configure(state = "normal")
+        self.main.vibration_demo_button.configure(state = "normal")
 
 class COMPortSelectorPopup(customtkinter.CTkToplevel):
     def __init__(self, main):
