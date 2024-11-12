@@ -170,6 +170,7 @@ class App(customtkinter.CTk):
         self.session_selection_dropdown.configure(state = "disabled")
         self.begin_experiment_button.configure(state = "disabled")
         self.vibration_demo_button.configure(state = "disabled")
+        self.settings_button.configure(state="disabled")
 
         # Generate the name of the log file (.txt or .csv) for that experiment and store it as an attribute (ID_date_{training or testing})
         self.export_log_file_name = "TrialLog_" + self.subject_ID + "_" + self.selected_trial_group + "_" + self.session + "_" + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")  + ".csv"
@@ -469,7 +470,7 @@ class ExperimentCompletePopup(customtkinter.CTkToplevel):
         self.main = main
 
         # set size and title of popup
-        self.geometry("800x275")
+        self.geometry("850x200")
         self.title("Experiment Complete!")
 
         self.protocol('WM_DELETE_WINDOW', self.closeWindow)
@@ -496,6 +497,7 @@ class ExperimentCompletePopup(customtkinter.CTkToplevel):
         self.main.session_selection_dropdown.configure(state = "normal")
         self.main.begin_experiment_button.configure(state = "normal")
         self.main.vibration_demo_button.configure(state = "normal")
+        self.main.settings_button.configure(state="normal")
 
 class COMPortSelectorPopup(customtkinter.CTkToplevel):
     def __init__(self, main):
@@ -552,11 +554,6 @@ class COMPortSelectorPopup(customtkinter.CTkToplevel):
         self.main.com_port = self.COMPort_selection.get()
         self.destroy()
         self.main.establish_serial_com()
-
-
-
-
-
 
 if __name__ == "__main__":
     app = App()
