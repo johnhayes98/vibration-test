@@ -23,6 +23,9 @@ class App(customtkinter.CTk):
         self.title("Vibration Test")
         self.geometry(f"{1100}x{580}")
 
+        # maximize the window
+        self.after(0, lambda:self.state('zoomed'))
+
         # configure grid layout (4x4)
         self.grid_columnconfigure(3, weight=1)
         self.grid_columnconfigure((0,1,2), weight=0)
