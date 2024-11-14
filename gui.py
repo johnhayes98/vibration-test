@@ -10,6 +10,7 @@ import pandas as pd
 from tkinter import filedialog
 import os
 from serial.tools import list_ports
+import sys
 
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -513,7 +514,7 @@ class COMPortSelectorPopup(customtkinter.CTkToplevel):
         self.geometry("450x275")
         self.title("Select COM Port")
 
-        self.protocol('WM_DELETE_WINDOW', exit)
+        self.protocol('WM_DELETE_WINDOW', sys.exit)
 
         #initialize empty COM Port List
         self.COMPortList = []
@@ -537,7 +538,7 @@ class COMPortSelectorPopup(customtkinter.CTkToplevel):
         self.select_button.pack(pady=10)
 
         # Add Cancel button
-        self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=exit)
+        self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=sys.exit)
         self.cancel_button.pack(pady=10)
 
         # Make sure the popup is modal (disables main window interaction)
