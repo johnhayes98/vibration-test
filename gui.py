@@ -100,7 +100,7 @@ class App(customtkinter.CTk):
         self.buttons_list = []
 
         # establish serial communication with Arduino
-        self.com_port = "COM9"
+        self.com_port = ""
         self.baud_rate = 9600
 
         self.establish_serial_com()
