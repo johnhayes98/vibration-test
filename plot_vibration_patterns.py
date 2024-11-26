@@ -14,7 +14,7 @@ def generate_time_series(data: dict):
     return time_series_dict
 
 
-def plot_vibration_pattern(vibration_dict_name):
+def plot_vibration_pattern(vibration_dict_name, show_plot = False):
     # Generate time series data for each entry
     time_series_data = generate_time_series(getattr(vibration_patterns, vibration_dict_name, None))
 
@@ -36,6 +36,10 @@ def plot_vibration_pattern(vibration_dict_name):
     # Add shared x-axis label
     plt.xlabel("Time (ms)")
     plt.tight_layout()  # Adjust layout to avoid overlap
+
+    if show_plot == True:
+        #this allows you to open the plot directly when calling it as a function, but waits to open all plots when running this script
+        plt.show()
 
 
 

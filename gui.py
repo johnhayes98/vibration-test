@@ -11,6 +11,7 @@ from tkinter import filedialog
 import os
 from serial.tools import list_ports
 import sys
+from plot_vibration_patterns import plot_vibration_pattern
 
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -340,6 +341,11 @@ class VibrationDemoPopup(customtkinter.CTkToplevel):
                 self.buttons_list.append(button)  # Add button to the list
         else:
             print(f"Error: '{trial_group}' is not a valid attribute in vibration_patterns.")
+
+        # generate the plot vibration patterns button
+        self.plot_vibrations_button = customtkinter.CTkButton(self, text = "Plot Vibration Patterns", command = lambda: plot_vibration_pattern(trial_group, show_plot=True))
+        self.plot_vibrations_button.pack(pady = (30,10))
+        self.buttons_list.append(self.plot_vibrations_button)
 
         # Regenerate the cancel button
         self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
