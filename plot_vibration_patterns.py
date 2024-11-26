@@ -19,7 +19,7 @@ def plot_vibration_pattern(vibration_dict_name, show_plot = False):
     time_series_data = generate_time_series(getattr(vibration_patterns, vibration_dict_name, None))
 
     # Create a vertical plot with subplots
-    fig, axes = plt.subplots(len(time_series_data), 1, figsize=(4, 4), sharex=True)
+    fig, axes = plt.subplots(len(time_series_data), 1, figsize=(4, len(time_series_data)), sharex=True)
 
     # Plot each time series in its own subplot
     for i, (key, series) in enumerate(time_series_data.items()):
