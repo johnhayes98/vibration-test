@@ -12,13 +12,13 @@ Arduino Nano:
 
 Features:
 - Vibration patterns can be set within vibration_patterns.py
-- - Each dictionary contains a set of vibrations
-- - Each vibration is formatted as a list of lists. 
-- - Each list contains two values: [duration_in_ms, intensity]. 
-- - Both should be a single byte ranging from 0 to 255.
+    - Each dictionary contains a set of vibrations
+    - Each vibration is formatted as a list of lists. 
+    - Each list contains two values: [duration_in_ms, intensity]. 
+    - Both should be a single byte ranging from 0 to 255.
 - gui.py imports all dictionaries in vibration_patterns.py
-- - Vibrations can be manually triggered within "Vibration Demo" menu
-- - Vibrations can be plotted using "Plot Vibration Patterns" button within "Vibration Demo" menu
+    - Vibrations can be manually triggered within "Vibration Demo" menu
+    - Vibrations can be plotted using "Plot Vibration Patterns" button within "Vibration Demo" menu
 - Set number of trials and directory for results file in Settings Menu
 
 
